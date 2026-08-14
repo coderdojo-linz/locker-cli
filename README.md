@@ -3,13 +3,35 @@
 Your CoderDojo Locker, from the command line. The eight-character code on your
 card is how you get in — there is nothing to sign up for.
 
+Needs Node 20 or newer. No dependencies, so it starts quickly and there is no
+native module to fail on a locked-down laptop.
+
+## Installing
+
+Every [release](https://github.com/coderdojo-linz/locker-cli/releases) has the
+packaged tarball attached — the same bytes npm would serve — so it installs
+without npm knowing the package exists:
+
 ```bash
-npx @coderdojo-linz/locker auth login
-npx @coderdojo-linz/locker upload ./my-game --name "Snake"
+npm install -g https://github.com/coderdojo-linz/locker-cli/releases/latest/download/coderdojo-linz-locker-0.1.0.tgz
 ```
 
-Needs Node 20 or newer. No dependencies, so `npx` starts quickly and there is no
-native module to fail on a locked-down laptop.
+Then:
+
+```bash
+locker auth login
+locker upload ./my-game --name "Snake"
+```
+
+It is not on the npm registry yet, so `npx @coderdojo-linz/locker` does not work
+— see [the issue about that](https://github.com/coderdojo-linz/locker-cli/issues/1).
+Once it is, that becomes the shorter way in and needs no install at all.
+
+From a clone, it runs straight out of the tree:
+
+```bash
+npm ci && npm run build && node dist/index.js --help
+```
 
 ## The four things you will actually do
 

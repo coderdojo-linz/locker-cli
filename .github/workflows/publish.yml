@@ -1,21 +1,19 @@
-# Publishes the CLI to npm, with no token anywhere.
+# Ships the CLI when a release is cut.
 #
-# npm revoked every classic token on 9 December 2025 and they cannot be
-# recreated. Granular tokens still exist but enforce 2FA and expire after 90
-# days at most, which for an unattended pipeline means a secret that silently
-# stops working four times a year.
+# Two destinations, one of which is not switched on yet.
 #
-# So this uses trusted publishing: GitHub mints a short-lived OIDC token for
-# this workflow, npm checks it against a trust relationship configured on the
-# npm side, and nothing long-lived is stored. Provenance is generated
-# automatically as a result — the package page can then show which commit and
-# which workflow built it.
+# A GitHub release always gets the packed tarball attached. That is enough to
+# install and run the CLI without npm knowing it exists, which is why it is the
+# path that works today.
 #
-# Deliberately not on every push to main. npm will not let a version be
-# replaced or a name reused, so publishing is the one step here that cannot be
-# taken back: it should happen because somebody decided to release.
-#
-# Cut a GitHub release whose tag is the version ("v0.2.0") and this runs.
+# npm needs a trust relationship configured on npmjs.com before it will accept
+# anything — see the repository issue about it. Until that exists there is no
+# way to publish: npm revoked every classic token on 9 December 2025 and they
+# cannot be recreated, so there is no token to fall back on. Rather than a
+# workflow that fails every release until somebody remembers, the npm step is
+# switched on by a repository variable. Set NPM_TRUSTED_PUBLISHING to "true"
+# once the npm side is configured and the next release publishes there too; no
+# change to this file is needed.
 name: Publish
 
 on:
@@ -24,49 +22,44 @@ on:
   workflow_dispatch:
     inputs:
       dryRun:
-        description: 'Pack and check without publishing.'
+        description: 'Build and pack without attaching or publishing anything.'
         type: boolean
         default: true
 
 permissions:
-  contents: read
-  # The whole mechanism. Without it there is no OIDC token to present, and npm
-  # falls back to looking for credentials that deliberately do not exist here.
+  # Uploading the tarball to the release.
+  contents: write
+  # Trusted publishing mints its OIDC token from this. Harmless while the npm
+  # step is off, and one less thing to remember when it is turned on.
   id-token: write
 
 jobs:
   publish:
-    # Must be a GitHub-hosted runner: trusted publishing does not accept OIDC
-    # tokens from self-hosted ones. This is why publishing lives on GitHub and
-    # not beside the rest of the pipeline on the Forgejo runners.
+    # Must be GitHub-hosted: trusted publishing does not accept OIDC tokens from
+    # self-hosted runners. It is why publishing lives here rather than beside
+    # the rest of the pipeline on the Forgejo runners.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          # Trusted publishing needs Node 22.14 or newer.
+          # 22.14 is the floor for trusted publishing, so the newest LTS keeps
+          # both paths available.
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
-      # The runner's bundled npm is usually new enough, but "usually" is not a
-      # thing to discover during a release. OIDC publishing landed in 11.5.1.
-      - name: Ensure npm understands trusted publishing
-        run: |
-          npm install -g npm@latest
-          npm --version
-
       - run: npm ci
 
-      # Never publish something that was not tested, even though CI already ran
-      # on this commit: a release can be cut from any commit, including one CI
+      # Never ship something that was not tested, even though CI already ran on
+      # this commit: a release can be cut from any commit, including one CI
       # never saw.
       - name: Build and test
         run: npm test
 
-      # A tag that disagrees with package.json publishes a version nobody asked
-      # for, under a name the release notes do not match.
+      # A tag that disagrees with package.json ships a version nobody asked for,
+      # under a name the release notes do not match.
       - name: The tag and package.json agree
         if: github.event_name == 'release'
         run: |
@@ -76,15 +69,47 @@ jobs:
             echo "Release tag is $tag but package.json says $packaged."
             exit 1
           fi
-          echo "Publishing $packaged."
+          echo "Shipping $packaged."
 
-      - name: What would be published
-        run: npm pack --dry-run
+      - name: Pack
+        id: pack
+        run: |
+          file="$(npm pack --silent)"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          echo "Packed $file ($(du -h "$file" | cut -f1))"
+          npm pack --dry-run
 
-      # No token, no NODE_AUTH_TOKEN, no secret of any kind. Access and
-      # provenance come from publishConfig in package.json, so publishing by
-      # hand from a laptop fails rather than quietly producing an unattested
-      # package.
-      - name: Publish
-        if: github.event_name == 'release' || inputs.dryRun == false
-        run: npm publish
+      # The tarball is a complete, installable package — the same bytes npm
+      # would have received — so a release is usable whether or not npm ever
+      # hears about it.
+      - name: Attach the tarball to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" "${{ steps.pack.outputs.file }}" --clobber
+          echo "Install it with:"
+          echo "  npm install https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.pack.outputs.file }}"
+
+      # Off until the npm organisation has a trusted publisher. No token is
+      # involved either way: access and provenance come from publishConfig, so
+      # this either authenticates by OIDC or does not run at all.
+      - name: Publish to npm
+        if: |
+          vars.NPM_TRUSTED_PUBLISHING == 'true' &&
+          (github.event_name == 'release' || inputs.dryRun == false)
+        run: |
+          npm install -g npm@latest
+          npm --version
+          npm publish
+
+      - name: Say where it went
+        if: github.event_name == 'release'
+        run: |
+          echo "Attached to the GitHub release: ${{ steps.pack.outputs.file }}"
+          if [ "${{ vars.NPM_TRUSTED_PUBLISHING }}" = "true" ]; then
+            echo "Published to npm."
+          else
+            echo "Not published to npm: NPM_TRUSTED_PUBLISHING is not set to true."
+            echo "That is expected until the npm organisation has a trusted publisher."
+          fi
