@@ -1,5 +1,5 @@
 {
-  "name": "@coderdojo/locker",
+  "name": "@coderdojo-linz/locker",
   "version": "0.1.0",
   "description": "Command line access to a CoderDojo Locker: upload, download, and manage projects with the code from your card.",
   "license": "MIT",
@@ -9,6 +9,18 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coderdojo-linz/locker-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/coderdojo-linz/locker-cli/issues"
+  },
+  "homepage": "https://github.com/coderdojo-linz/locker-cli#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "files": [
     "dist",

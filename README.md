@@ -4,8 +4,8 @@ Your CoderDojo Locker, from the command line. The eight-character code on your
 card is how you get in — there is nothing to sign up for.
 
 ```bash
-npx @coderdojo/locker auth login
-npx @coderdojo/locker upload ./my-game --name "Snake"
+npx @coderdojo-linz/locker auth login
+npx @coderdojo-linz/locker upload ./my-game --name "Snake"
 ```
 
 Needs Node 20 or newer. No dependencies, so `npx` starts quickly and there is no

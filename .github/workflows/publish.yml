@@ -1,9 +1,19 @@
-# Publishes the CLI to npm.
+# Publishes the CLI to npm, with no token anywhere.
+#
+# npm revoked every classic token on 9 December 2025 and they cannot be
+# recreated. Granular tokens still exist but enforce 2FA and expire after 90
+# days at most, which for an unattended pipeline means a secret that silently
+# stops working four times a year.
+#
+# So this uses trusted publishing: GitHub mints a short-lived OIDC token for
+# this workflow, npm checks it against a trust relationship configured on the
+# npm side, and nothing long-lived is stored. Provenance is generated
+# automatically as a result — the package page can then show which commit and
+# which workflow built it.
 #
 # Deliberately not on every push to main. npm will not let a version be
-# replaced or a name be reused, so publishing is the one step here that cannot
-# be taken back — it should happen because somebody decided to release, not
-# because somebody merged.
+# replaced or a name reused, so publishing is the one step here that cannot be
+# taken back: it should happen because somebody decided to release.
 #
 # Cut a GitHub release whose tag is the version ("v0.2.0") and this runs.
 name: Publish
@@ -20,21 +30,32 @@ on:
 
 permissions:
   contents: read
-  # Lets npm record where the package was built from, which is what makes the
-  # "Provenance" badge on the package page mean anything.
+  # The whole mechanism. Without it there is no OIDC token to present, and npm
+  # falls back to looking for credentials that deliberately do not exist here.
   id-token: write
 
 jobs:
   publish:
+    # Must be a GitHub-hosted runner: trusted publishing does not accept OIDC
+    # tokens from self-hosted ones. This is why publishing lives on GitHub and
+    # not beside the rest of the pipeline on the Forgejo runners.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
+          # Trusted publishing needs Node 22.14 or newer.
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           cache: npm
+
+      # The runner's bundled npm is usually new enough, but "usually" is not a
+      # thing to discover during a release. OIDC publishing landed in 11.5.1.
+      - name: Ensure npm understands trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - run: npm ci
 
@@ -60,15 +81,10 @@ jobs:
       - name: What would be published
         run: npm pack --dry-run
 
+      # No token, no NODE_AUTH_TOKEN, no secret of any kind. Access and
+      # provenance come from publishConfig in package.json, so publishing by
+      # hand from a laptop fails rather than quietly producing an unattested
+      # package.
       - name: Publish
         if: github.event_name == 'release' || inputs.dryRun == false
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "Cannot publish: no NPM_TOKEN in this repository's Actions secrets."
-            exit 1
-          fi
-          # --access public because the package is scoped, and a scoped package
-          # is private by default however public the repository is.
-          npm publish --access public --provenance
+        run: npm publish

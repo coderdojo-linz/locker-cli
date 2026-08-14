@@ -97,7 +97,7 @@ export class ApiClient {
       throw new CliError(`The Locker sent a reply this version cannot read.`, {
         kind: 'server',
         exitCode: Exit.Failure,
-        recovery: 'npx @coderdojo/locker@latest --version',
+        recovery: 'npx @coderdojo-linz/locker@latest --version',
         cause,
       });
     }
