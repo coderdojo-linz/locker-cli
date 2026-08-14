@@ -1,0 +1,48 @@
+# Builds and tests the CLI on the platforms it claims to run on.
+#
+# This repository is a mirror — the CLI is developed in the private monorepo
+# beside the API it speaks to, and pushed here by that repository's pipeline.
+# The checks still belong here: this is the tree people read, fork and install
+# from, and a public package that does not build is a public package nobody
+# trusts.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      # The CLI is cross-platform by design and its path handling is the part
+      # most likely to break — %APPDATA% against XDG, backslashes against
+      # forward slashes. Both are tested from both, but running on both is what
+      # actually proves it.
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # 20 is the floor the package declares; 24 is what a fresh npx picks.
+        node: ['20', '24']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # No runtime dependencies, so this only fetches TypeScript and the types.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build and test
+        run: npm test
+
+      # Proves the thing npx would actually run does run, on both platforms.
+      - name: The binary starts
+        run: node dist/index.js --version

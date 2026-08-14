@@ -1,0 +1,74 @@
+# Publishes the CLI to npm.
+#
+# Deliberately not on every push to main. npm will not let a version be
+# replaced or a name be reused, so publishing is the one step here that cannot
+# be taken back — it should happen because somebody decided to release, not
+# because somebody merged.
+#
+# Cut a GitHub release whose tag is the version ("v0.2.0") and this runs.
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dryRun:
+        description: 'Pack and check without publishing.'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  # Lets npm record where the package was built from, which is what makes the
+  # "Provenance" badge on the package page mean anything.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+
+      # Never publish something that was not tested, even though CI already ran
+      # on this commit: a release can be cut from any commit, including one CI
+      # never saw.
+      - name: Build and test
+        run: npm test
+
+      # A tag that disagrees with package.json publishes a version nobody asked
+      # for, under a name the release notes do not match.
+      - name: The tag and package.json agree
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          packaged="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$packaged" ]; then
+            echo "Release tag is $tag but package.json says $packaged."
+            exit 1
+          fi
+          echo "Publishing $packaged."
+
+      - name: What would be published
+        run: npm pack --dry-run
+
+      - name: Publish
+        if: github.event_name == 'release' || inputs.dryRun == false
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "Cannot publish: no NPM_TOKEN in this repository's Actions secrets."
+            exit 1
+          fi
+          # --access public because the package is scoped, and a scoped package
+          # is private by default however public the repository is.
+          npm publish --access public --provenance
