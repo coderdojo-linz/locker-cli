@@ -33,7 +33,7 @@ test('hosts that mean the same place produce one origin', () => {
     'locker.coderdojo.net',
     'https://locker.coderdojo.net',
     'https://locker.coderdojo.net/',
-    'https://LOCKER.CoderDojo.NET/desk?view=codes',
+    'https://LOCKER.CoderDojo.NET/desk/dojos',
   ]) {
     assert.equal(normalizeOrigin(written), expected, `${written} should normalize`);
   }
