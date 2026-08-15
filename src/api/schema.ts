@@ -723,7 +723,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/sso/callback": {
+    "/api/auth/sso/complete": {
         parameters: {
             query?: never;
             header?: never;
@@ -732,10 +732,7 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: {
-                    code?: string;
-                    state?: string;
-                };
+                query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
