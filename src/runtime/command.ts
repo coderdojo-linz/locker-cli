@@ -69,6 +69,11 @@ export const GLOBAL_OPTIONS: Record<string, OptionSpec> = {
     description: 'Locker code for this command only. Never saved.',
     placeholder: '<code>',
   },
+  key: {
+    type: 'string',
+    description: 'API key for this command only. Never saved. Or set LOCKER_API_KEY.',
+    placeholder: '<key>',
+  },
   json: { type: 'boolean', description: 'Machine-readable output (schema v1).' },
   output: {
     type: 'string',

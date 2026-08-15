@@ -1,5 +1,5 @@
 import type { Command, CommandResult } from '../runtime/command.js';
-import { clearStoredCode, storedOrigins } from '../runtime/credentials.js';
+import { clearStoredCode, clearStoredKey, storedOrigins } from '../runtime/credentials.js';
 
 /**
  * Forgets the saved code for this host.
@@ -15,13 +15,19 @@ export const authLogoutCommand: Command = {
   description:
     'Removes the saved code for this host. The locker and everything in it is untouched.\n' +
     'Codes set with --code or LOCKER_CODE were never saved, so there is nothing to remove.',
-  usage: 'locker auth logout [--all]',
+  usage: 'locker auth logout [--all] [--key]',
   options: {
     all: { type: 'boolean', description: 'Forget saved codes for every host, not just this one.' },
+    // Not folded into the same command by default: the code belongs to whoever
+    // is sitting here and the key to a mentor's tooling, and somebody clearing
+    // a shared laptop between children should not silently take out the key
+    // that a cron job on the same machine depends on.
+    key: { type: 'boolean', description: 'Forget the saved API key as well as the code.' },
   },
-  examples: ['locker auth logout', 'locker auth logout --all'],
+  examples: ['locker auth logout', 'locker auth logout --all', 'locker auth logout --key'],
   async run(context, input): Promise<CommandResult> {
     const everywhere = input.values['all'] === true;
+    const alsoKey = input.values['key'] === true;
     const targets = everywhere ? storedOrigins() : [context.origin];
 
     if (context.dryRun) {
@@ -35,13 +41,23 @@ export const authLogoutCommand: Command = {
     }
 
     const forgotten = targets.filter((origin) => clearStoredCode(origin));
+    const keysForgotten = alsoKey ? targets.filter((origin) => clearStoredKey(origin)) : [];
 
-    if (forgotten.length === 0) {
+    if (forgotten.length === 0 && keysForgotten.length === 0) {
       context.reporter.note(`Nothing was saved for ${everywhere ? 'any host' : context.origin}.`);
     } else {
-      context.reporter.success(
-        `Forgot the code for ${forgotten.join(', ')}.`,
-      );
+      if (forgotten.length > 0) {
+        context.reporter.success(`Forgot the code for ${forgotten.join(', ')}.`);
+      }
+      if (keysForgotten.length > 0) {
+        context.reporter.success(`Forgot the API key for ${keysForgotten.join(', ')}.`);
+      }
+    }
+
+    // The key outlives the code unless it was asked for, so say so rather than
+    // leaving somebody to believe a shared laptop was cleared when it was not.
+    if (!alsoKey && context.apiKeySource === 'file') {
+      context.reporter.note('A saved API key is still here. "locker auth logout --key" removes it.');
     }
 
     // Said only when it is actually the reason a later command will still work,

@@ -24,6 +24,7 @@ interface CredentialsFileShape {
   version?: number;
   codes?: Record<string, string>;
   devices?: Record<string, string>;
+  keys?: Record<string, string>;
 }
 
 const load = (env?: NodeJS.ProcessEnv): CredentialsFileShape =>
@@ -45,13 +46,46 @@ export function readStoredCode(origin: string, env?: NodeJS.ProcessEnv): string 
  * one's locker, and they would have no reason to suspect it.
  */
 export function writeStoredCode(origin: string, code: string, env?: NodeJS.ProcessEnv): void {
-  const file = credentialsFile(env);
   const existing = load(env);
-  writeJsonFile(file, {
+  writeJsonFile(credentialsFile(env), {
+    ...existing,
     version: 1,
     codes: { ...existing.codes, [origin]: code },
-    ...(existing.devices ? { devices: existing.devices } : {}),
   });
+}
+
+/**
+ * The key a mentor's own tooling authenticates with, kept the same way a code is.
+ *
+ * A locker code opens one locker; a key stands in for somebody at the desk and
+ * opens whatever its role reaches. It is the more dangerous of the two, which is
+ * the argument for keeping it here beside the code rather than in the config
+ * file: `config show` does not print this, and a settings file pasted into a
+ * chat does not carry it.
+ */
+export function readStoredKey(origin: string, env?: NodeJS.ProcessEnv): string | null {
+  const stored = load(env).keys?.[origin];
+  return typeof stored === 'string' && stored.length > 0 ? stored : null;
+}
+
+export function writeStoredKey(origin: string, key: string, env?: NodeJS.ProcessEnv): void {
+  const existing = load(env);
+  writeJsonFile(credentialsFile(env), {
+    ...existing,
+    version: 1,
+    keys: { ...existing.keys, [origin]: key },
+  });
+}
+
+/** Returns whether there was a key to forget, so `auth logout` can say so. */
+export function clearStoredKey(origin: string, env?: NodeJS.ProcessEnv): boolean {
+  const existing = load(env);
+  const keys = { ...existing.keys };
+  if (!(origin in keys)) return false;
+
+  delete keys[origin];
+  writeJsonFile(credentialsFile(env), { ...existing, version: 1, keys });
+  return true;
 }
 
 /**
@@ -72,9 +106,13 @@ export function readDeviceKey(origin: string, env?: NodeJS.ProcessEnv): string {
   if (typeof stored === 'string' && stored.length > 0) return stored;
 
   const minted = randomBytes(16).toString('base64url');
+  // Spread what is already there rather than rebuilding from the two fields
+  // this function knows about. Written out by hand, adding a third kind of
+  // credential to the file meant every writer that had not heard of it quietly
+  // deleted it — which looked exactly like a key that had never saved.
   writeJsonFile(credentialsFile(env), {
+    ...existing,
     version: 1,
-    ...(existing.codes ? { codes: existing.codes } : {}),
     devices: { ...existing.devices, [origin]: minted },
   });
   return minted;
@@ -93,11 +131,16 @@ export function clearStoredCode(origin: string, env?: NodeJS.ProcessEnv): boolea
   // child's `locker` see work the last one had waiting for review.
   const devices = { ...existing.devices };
   delete devices[origin];
-  if (Object.keys(codes).length === 0 && Object.keys(devices).length === 0) {
+  // An API key is not the locker code and is not forgotten by this: it belongs
+  // to a mentor's tooling rather than to whoever is sitting here, and `auth
+  // logout --key` is how it goes.
+  const keys = existing.keys ?? {};
+  if (Object.keys(codes).length === 0 && Object.keys(devices).length === 0 &&
+      Object.keys(keys).length === 0) {
     removeJsonFile(file);
     return true;
   }
-  writeJsonFile(file, { version: 1, codes, devices });
+  writeJsonFile(file, { version: 1, codes, devices, keys });
   return true;
 }
 

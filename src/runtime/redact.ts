@@ -45,6 +45,14 @@ const localUploadTokenPattern = /(\/api\/projects\/uploads\/)[^\s"'/?]+/gi;
 export interface RedactionSecrets {
   /** The locker code in play, if there is one. Matched case-insensitively. */
   code?: string | null;
+  /**
+   * The desk credential in play, if there is one.
+   *
+   * Matched exactly rather than case-insensitively: a key is generated rather
+   * than typed, so its case is its own, and matching loosely would risk masking
+   * an unrelated string that differed only in capitalisation.
+   */
+  apiKey?: string | null;
 }
 
 export function redact(value: string, secrets: RedactionSecrets = {}): string {
@@ -57,6 +65,11 @@ export function redact(value: string, secrets: RedactionSecrets = {}): string {
   // turn the whole log into mask characters.
   if (code && code.length >= 4) {
     result = result.replaceAll(new RegExp(escapeForRegExp(code), 'gi'), MASK);
+  }
+
+  const apiKey = secrets.apiKey?.trim();
+  if (apiKey && apiKey.length >= 8) {
+    result = result.replaceAll(apiKey, MASK);
   }
   return result;
 }

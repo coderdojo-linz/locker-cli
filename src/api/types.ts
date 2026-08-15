@@ -1,95 +1,62 @@
+import type { components } from './schema.js';
+
 /**
  * The shapes the Locker API sends back.
  *
- * Written out rather than generated, and deliberately tolerant: `npx` runs
- * whatever version was published last against whatever version a Dojo happens to
- * be running, so an unknown field is ignored rather than treated as a problem.
- * Only fields the CLI actually reads are declared.
+ * Named here, generated in schema.ts. These used to be written out by hand and
+ * kept deliberately loose, on the grounds that `npx` runs whatever was published
+ * last against whatever a Dojo happens to be running — but loose by hand meant
+ * loose in one direction only: a field the CLI read and the API had renamed was
+ * a runtime surprise rather than a build error. The document the API publishes
+ * is the source now, and the tolerance that mattered is still there: an unknown
+ * field is ignored, because nothing here validates a response, it only describes
+ * one.
+ *
+ * Aliases rather than re-exports of `components["schemas"]["…"]` at every call
+ * site, so the rest of the CLI reads the same as it always did.
  */
 
-export interface ProjectFileDetails {
-  id: string;
-  name: string;
-  contentType: string;
-  size: number;
-  /** Set for a pasted link rather than an uploaded file; such a file has no bytes. */
-  externalUrl: string | null;
-  uploadedAt: string;
-  /** The folder the file sat in, kept on the row rather than in storage. */
-  relativePath: string | null;
-  shareCode: string | null;
-}
+type Schemas = components['schemas'];
 
-export interface ProjectDetails {
-  id: string;
-  name: string;
-  createdAt: string;
-  files: ProjectFileDetails[];
-  shareCode: string | null;
-  /**
-   * Where this stands with the mentors at a Dojo that asks them to look:
-   * `NotRequired` everywhere else. Absent from an older server, which is why
-   * every reader treats a missing value as `NotRequired`.
-   */
-  reviewState?: string;
-  reviewNote?: string | null;
-}
+export type LockerDetails = Schemas['LockerDetails'];
+export type LockerSummary = Schemas['LockerSummary'];
+export type LockerCodeReplacement = Schemas['LockerCodeReplacement'];
+export type ProjectDetails = Schemas['ProjectDetails'];
+export type ProjectFileDetails = Schemas['ProjectFileDetails'];
+export type ProjectShareDetails = Schemas['ProjectShareDetails'];
+export type SharedLinkDetails = Schemas['SharedLinkDetails'];
+export type MentorSharedLinkDetails = Schemas['MentorSharedLinkDetails'];
+export type AuthorizedUpload = Schemas['AuthorizedUpload'];
+export type AuthorizedUploadFile = Schemas['AuthorizedUploadFile'];
+export type UploadFileRequest = Schemas['UploadFileRequest'];
+export type ApprovalTicket = Schemas['ApprovalTicket'];
+export type UploadPermitDetails = Schemas['UploadPermitDetails'];
 
-export interface LockerDetails {
-  id: string;
-  code: string;
-  name: string;
-  ownerName: string | null;
-  status: string;
-  usedBytes: number;
-  storageLimitBytes: number;
-  lastActivityAt: string;
-  projects: ProjectDetails[];
-}
-
-/** One file's upload target: where to PUT it, and the headers storage insists on. */
-export interface AuthorizedUploadFile {
-  name: string;
-  url: string;
-  headers: Record<string, string>;
-}
-
-export interface AuthorizedUpload {
-  ticket: string;
-  expiresAt: string;
-  files: AuthorizedUploadFile[];
-}
-
-export interface ProjectShareDetails {
-  code: string;
-  createdAt: string;
-  expiresAt: string;
-}
-
-export interface SharedLinkDetails {
-  code: string;
-  projectId: string;
-  projectName: string;
-  fileId: string | null;
-  fileName: string | null;
-  createdAt: string;
-  expiresAt: string;
-}
-
-/** What the CLI sends when asking for upload URLs. */
-export interface UploadFileRequest {
-  name: string;
-  size: number;
-  contentType: string;
-}
+/** Everything the desk does, for the commands that carry a key. */
+export type CodeBatchDetails = Schemas['CodeBatchDetails'];
+export type EventDetails = Schemas['EventDetails'];
+export type EventPolicy = Schemas['EventPolicy'];
+export type DefaultPolicyDetails = Schemas['DefaultPolicyDetails'];
+export type CardDesignDetails = Schemas['CardDesignDetails'];
+export type ApiKeyDetails = Schemas['ApiKeyDetails'];
+export type CreatedApiKey = Schemas['CreatedApiKey'];
+export type MentorDetails = Schemas['MentorDetails'];
+export type SettingsDetails = Schemas['SettingsDetails'];
+export type GuestInviteDetails = Schemas['GuestInviteDetails'];
+export type PendingApproval = Schemas['PendingApproval'];
+export type PendingReview = Schemas['PendingReview'];
+export type AuthenticatedMentor = Schemas['AuthenticatedMentor'];
+export type PaperSize = Schemas['PaperSize'];
 
 /**
  * Why a Dojo would not let this upload start, in the words a client switches on.
  *
- * Rides on the 403 the authorize step answers with, beside the sentence a person
- * reads. The sentence is the server's and is shown as written; this is what
- * decides whether the CLI can do something about it — hold up a QR code, wait
- * for a poster to be scanned — or can only say so and stop.
+ * The one shape still written by hand, because it is not a response: it rides
+ * inside the problem body of a 403, beside the sentence a person reads, and a
+ * problem's extensions are untyped by construction. The sentence is the
+ * server's and is shown as written; this is what decides whether the CLI can do
+ * something about it — hold up a QR code, wait for a poster to be scanned — or
+ * can only say so and stop.
  */
 export interface UploadGateProblem {
   verdict: 'NeedsApproval' | 'NeedsEventCode' | 'WrongNetwork' | string;
@@ -97,22 +64,4 @@ export interface UploadGateProblem {
   eventId: string | null;
   eventName: string | null;
   approvalMinutes: number;
-}
-
-/** A child's request for a mentor to vouch for what they are saving. */
-export interface ApprovalTicket {
-  code: string;
-  status: 'Pending' | 'Approved' | 'Denied' | 'Expired' | string;
-  /** The whole address, which is what goes inside the QR code. */
-  approveUrl: string;
-  expiresAt: string;
-  decidedByName: string | null;
-  permitExpiresAt: string | null;
-}
-
-/** What a locker is currently allowed, after a mentor or a scanned poster said so. */
-export interface UploadPermitDetails {
-  expiresAt: string;
-  singleUse: boolean;
-  source: string;
 }

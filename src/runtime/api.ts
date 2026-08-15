@@ -29,12 +29,19 @@ export class ApiClient {
    * @param deviceKey Called on first use rather than up front, so a command that
    * never talks to a locker does not mint and write one.
    */
+  /**
+   * @param apiKey The desk credential this run carries, if any. A locker code
+   * opens one locker and travels in the path; a key stands in for somebody at
+   * the desk and travels in a header, so the two are independent — a command may
+   * carry both, and the API reads whichever the route asks for.
+   */
   constructor(
     readonly origin: string,
     private readonly language: string,
     private readonly reporter: Reporter,
     private readonly diagnostics: Diagnostics,
     private readonly deviceKey: () => string,
+    private readonly apiKey: string | null = null,
     private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ) {}
 
@@ -169,6 +176,7 @@ export class ApiClient {
       // work first, this is what lets the child who uploaded it still open it.
       'X-Locker-Device': this.deviceKey(),
     };
+    if (this.apiKey) headers['X-Api-Key'] = this.apiKey;
     if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 
     this.reporter.debug(2, `${method} ${url}`);

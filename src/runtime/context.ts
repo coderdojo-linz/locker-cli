@@ -1,7 +1,7 @@
 import { ApiClient } from './api.js';
 import { codeProblem, normalizeCode } from './code.js';
 import { readConfig } from './config.js';
-import { readDeviceKey, readStoredCode } from './credentials.js';
+import { readDeviceKey, readStoredCode, readStoredKey } from './credentials.js';
 import { Diagnostics } from './diagnostics.js';
 import { CliError, Exit, usageError } from './exit.js';
 import { Reporter, type OutputMode } from './reporter.js';
@@ -10,12 +10,13 @@ import { Palette, colorEnabled } from './style.js';
 export const DEFAULT_HOST = 'https://locker.coderdojo.net';
 export const DEFAULT_LANGUAGE = 'de';
 
-/** Where the locker code came from. Reported by `auth status`, so nothing is mysterious. */
+/** Where a credential came from. Reported by `auth status`, so nothing is mysterious. */
 export type CodeSource = 'flag' | 'environment' | 'file' | 'none';
 
 export interface GlobalFlags {
   host?: string | undefined;
   code?: string | undefined;
+  key?: string | undefined;
   json?: boolean | undefined;
   output?: string | undefined;
   'no-json'?: boolean | undefined;
@@ -31,6 +32,9 @@ export interface Context {
   readonly origin: string;
   readonly code: string | null;
   readonly codeSource: CodeSource;
+  /** The desk credential this run carries, if any. Never printed. */
+  readonly apiKey: string | null;
+  readonly apiKeySource: CodeSource;
   readonly language: string;
   readonly api: ApiClient;
   readonly reporter: Reporter;
@@ -40,6 +44,8 @@ export interface Context {
   readonly dryRun: boolean;
   /** The code, or a refusal that names the command to run. */
   requireCode(): string;
+  /** The key, or a refusal that names the command to run. */
+  requireKey(): string;
 }
 
 /**
@@ -148,8 +154,13 @@ export function createContext(flags: GlobalFlags, env: NodeJS.ProcessEnv = proce
   const language = resolveLanguage(flags, env, config.lang);
 
   const { code, codeSource } = resolveCode(flags, env, origin);
-  diagnostics.useSecrets({ code });
-  diagnostics.record(`resolved host ${origin} (code from ${codeSource})`);
+  const { key: apiKey, source: apiKeySource } = resolveKey(flags, env, origin);
+  // Both, so neither can be read back out of a diagnostic bundle somebody
+  // attaches to a bug report.
+  diagnostics.useSecrets({ code, apiKey });
+  diagnostics.record(
+    `resolved host ${origin} (code from ${codeSource}, key from ${apiKeySource})`,
+  );
 
   // Memoised: the first command that talks to a locker mints and stores a key,
   // and every later one reuses it. Lazy, so `--help` writes no file.
@@ -157,12 +168,14 @@ export function createContext(flags: GlobalFlags, env: NodeJS.ProcessEnv = proce
   const api = new ApiClient(origin, language, reporter, diagnostics, () => {
     deviceKey ??= readDeviceKey(origin, env);
     return deviceKey;
-  });
+  }, apiKey);
 
   return {
     origin,
     code,
     codeSource,
+    apiKey,
+    apiKeySource,
     language,
     api,
     reporter,
@@ -178,7 +191,43 @@ export function createContext(flags: GlobalFlags, env: NodeJS.ProcessEnv = proce
         recovery: 'locker auth login',
       });
     },
+    requireKey(): string {
+      if (apiKey) return apiKey;
+      throw new CliError(
+        'No API key. The desk commands act as somebody at the desk, and need one.',
+        {
+          kind: 'not-authenticated',
+          exitCode: Exit.NotAuthenticated,
+          recovery: 'locker auth key',
+        },
+      );
+    },
   };
+}
+
+/**
+ * The same order as the locker code, for the same reason.
+ *
+ * A key belongs to a program more often than to a person, so the environment is
+ * the common case: CI sets LOCKER_API_KEY and nothing is written to disk. The
+ * flag beats it for a one-off, and the saved file is the convenience for
+ * somebody running these from their own laptop.
+ */
+function resolveKey(
+  flags: GlobalFlags,
+  env: NodeJS.ProcessEnv,
+  origin: string,
+): { key: string | null; source: CodeSource } {
+  const fromFlag = flags.key?.trim();
+  if (fromFlag) return { key: fromFlag, source: 'flag' };
+
+  const environment = fromEnvironment(env, 'LOCKER_API_KEY');
+  if (environment) return { key: environment, source: 'environment' };
+
+  const stored = readStoredKey(origin, env);
+  if (stored) return { key: stored, source: 'file' };
+
+  return { key: null, source: 'none' };
 }
 
 /**

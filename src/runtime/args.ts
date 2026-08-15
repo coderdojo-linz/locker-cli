@@ -96,6 +96,7 @@ export function parseCommandLine(argv: string[], commands: Command[]): ParsedCom
     flags: {
       host: asString(values['host']),
       code: asString(values['code']),
+      key: asString(values['key']),
       json: values['json'] === true,
       output: asString(values['output']),
       'no-json': values['no-json'] === true,

@@ -195,11 +195,66 @@ locker projects delete Snake --dry-run
 locker projects delete Snake --yes
 ```
 
+## Running the desk
+
+Everything a mentor does at `/desk` can be done here instead, with an API key
+rather than a locker code. Make one at the desk under **API keys**, and hand it
+to the CLI the way a program should — in the environment:
+
+```bash
+export LOCKER_API_KEY=cdc_…
+locker admin lockers list
+locker admin batches new "Autumn term" --count 48 --dojo "Dojo Linz"
+locker admin batches print "Autumn term" --out sheets.pdf
+```
+
+At your own laptop, `locker auth key` saves one instead. It never takes the key
+as an argument — a command line ends up in the shell history and in `ps` — so it
+asks, or reads standard input:
+
+```bash
+locker auth key                     # asks, hidden
+echo "$LOCKER_API_KEY" | locker auth key --key-stdin
+locker auth status                  # says what the key reaches
+```
+
+`locker admin --help` lists all of it. In short:
+
+| | |
+| --- | --- |
+| `admin lockers` | list, show, rename, replace-code, print, empty |
+| `admin batches` | list, show, new, set, print, rm |
+| `admin dojos` | list, show, new, rename, rm, rules, poster |
+| `admin review` | waiting, decide, queue, publish |
+| `admin shares` | list, revoke |
+| `admin designs` | list, rm |
+| `admin guests` | list, invite, revoke |
+| `admin settings` | show and change the installation limits |
+| `admin mentors` | list, add, role, rm |
+
+### What a key reaches
+
+A key carries a role, and the role is the whole of what it can do.
+
+- **mentor** — lockers, code batches, Dojos and their rules, card designs,
+  approvals, public links.
+- **admin** — all of that, plus `admin settings` and `admin mentors`. Only an
+  administrator can make an admin key.
+- **scan-and-print** — printing, and nothing else.
+
+Asking for something out of reach is refused with exit code 4 and a pointer to
+`locker auth status`, rather than a bare "not allowed".
+
+No key of any role can create, rename or delete keys — that is only ever done by
+a person at the desk. It is what makes revoking a key final, and it is why there
+is no `locker admin keys`.
+
 ## Settings and environment
 
 | Variable | Same as |
 | --- | --- |
 | `LOCKER_CODE` | `--code` |
+| `LOCKER_API_KEY` | `--key` |
 | `LOCKER_HOST` | `--host` |
 | `LOCKER_OUTPUT` | `--output` |
 | `LOCKER_LANG` | `--lang` |
@@ -243,3 +298,16 @@ npm install
 npm run build
 npm test
 ```
+
+The API client in `src/api/schema.ts` is generated from the document the API
+publishes, and both are committed — publishing this package must not need the
+.NET SDK. When the API changes, regenerate both halves:
+
+```bash
+pwsh ../../scripts/openapi.ps1     # rewrites src/CoderDojoCloud.Api/openapi.json
+npm run generate                   # rewrites src/api/schema.ts
+```
+
+CI runs `openapi.ps1 -Check` and `npm run generate:check`, so a route added
+without regenerating fails the build rather than quietly leaving the CLI typed
+against an API that has moved on.

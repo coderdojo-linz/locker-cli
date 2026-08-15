@@ -11,6 +11,13 @@ import { filesDeleteCommand } from './filesDelete.js';
 import { filesListCommand } from './filesList.js';
 import { filesRenameCommand } from './filesRename.js';
 import { filesReplaceCommand } from './filesReplace.js';
+import { authKeyCommand } from './authKey.js';
+import { adminBatchCommands } from './adminBatches.js';
+import { adminPeopleCommands } from './adminPeople.js';
+import { adminShareCommands } from './adminShares.js';
+import { adminDojoCommands } from './adminDojos.js';
+import { adminLockerCommands } from './adminLockers.js';
+import { adminReviewCommands } from './adminReview.js';
 import { projectsCreateCommand } from './projectsCreate.js';
 import { projectsDeleteCommand } from './projectsDelete.js';
 import { projectsListCommand } from './projectsList.js';
@@ -39,6 +46,7 @@ export const COMMANDS: Command[] = [
 
   authLoginCommand,
   authLogoutCommand,
+  authKeyCommand,
   authStatusCommand,
 
   projectsCreateCommand,
@@ -61,6 +69,15 @@ export const COMMANDS: Command[] = [
   configSetCommand,
   configClearCommand,
 
+  // The desk, for whoever carries a key. Last because a child never needs any
+  // of it, and the order above is the order somebody reads the help in.
+  ...adminLockerCommands,
+  ...adminBatchCommands,
+  ...adminDojoCommands,
+  ...adminReviewCommands,
+  ...adminShareCommands,
+  ...adminPeopleCommands,
+
   rawCommand,
 ];
 
@@ -74,7 +91,7 @@ export const COMMON_TASKS: { command: string; blurb: string }[] = [
 ];
 
 /** The branches, in the order help lists them. */
-export const BRANCHES = ['auth', 'projects', 'files', 'share', 'config'] as const;
+export const BRANCHES = ['auth', 'projects', 'files', 'share', 'config', 'admin'] as const;
 
 export const branchOf = (command: Command): string | null =>
   command.path.length > 1 ? (command.path[0] as string) : null;
