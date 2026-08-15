@@ -7,6 +7,12 @@ export interface OptionSpec {
   description: string;
   /** Shown in help as `--out <dir>`. Omitted for booleans. */
   placeholder?: string;
+  /**
+   * Accepted, but left out of help. For a spelling that has been superseded and
+   * still has to work: a script written last term, or a README somebody printed.
+   * Documenting both would put the old name back in front of new readers.
+   */
+  hidden?: boolean;
 }
 
 /**

@@ -20,7 +20,8 @@ Then:
 
 ```bash
 locker auth login
-locker upload ./my-game --name "Snake"
+locker projects create "Snake"
+locker upload ./my-game --project Snake
 ```
 
 It is not on the npm registry yet, so `npx @coderdojo-linz/locker` does not work
@@ -33,40 +34,52 @@ From a clone, it runs straight out of the tree:
 npm ci && npm run build && node dist/index.js --help
 ```
 
-## The four things you will actually do
+## The things you will actually do
 
 ```bash
-locker auth login                 # enter the code from your card
-locker status                     # what is in your locker, and how full it is
-locker upload ./my-project        # save work into a new project
-locker download Snake             # get work back out
+locker auth login                        # enter the code from your card
+locker status                            # what is in your locker, and how full it is
+locker projects create Snake             # start a project
+locker upload ./my-game --project Snake  # put work into it
+locker download Snake                    # get work back out
 ```
 
 `locker --help` lists everything. `locker <command> --help` explains one thing.
 
 ## Uploading
 
-Always say where the files go — `--name` makes a new project, `--to` adds to one
-that is already there. Neither is guessed, because a project name is not unique
-and a coincidence is a poor way to decide where your work lands.
-
-A folder keeps its shape, so this arrives as a `game` folder with `img/` still
-inside it:
+A project is made first, and then uploaded into. Two steps, one flag each time:
 
 ```bash
-locker upload ./game --name "Snake"
+locker projects create "Snake"
+locker upload ./game --project Snake
 ```
 
+`--project` takes a name or an id and never invents one. A name you have not
+made yet is refused, naming the command that would make it — so a mistyped
+`--project Snak` is a question rather than a second project called "Snak" with
+one file in it. Every upload after the first is typed exactly like this one:
+
 ```bash
-locker upload extra-level.py --to Snake
+locker upload extra-level.py --project Snake
 ```
+
+A folder keeps its shape, so `./game` arrives as a `game` folder with `img/`
+still inside it.
+
+One thing is still never guessed for you: a name matching two projects is
+refused, listing both, because nothing stops you calling two of them "Game". Use
+the id from `locker projects list` to say which.
 
 Look before you leap. `--dry-run` lists every file, the total, and how much room
 is left, without uploading anything:
 
 ```bash
-locker upload ./game --name "Snake" --dry-run
+locker upload ./game --project "Snake" --dry-run
 ```
+
+`--name` and `--to` are still accepted and both mean `--project`. `--to` behaves
+exactly as it always did; `--name` no longer makes a project, and says so.
 
 `.git`, `node_modules` and similar are skipped, and the CLI tells you it skipped
 them. `--all` includes them.

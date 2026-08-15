@@ -21,18 +21,22 @@ export async function fetchLocker(context: Context): Promise<LockerDetails> {
 }
 
 /**
- * Finds the project a reference names, or refuses to choose.
+ * Looks for the project a reference names, and says so when there is none.
  *
  * Accepts a full id, the short form shown in listings, or a name. Names are not
  * unique within a locker — nothing stops a child calling two projects "Game" —
  * so two matches is an error listing both rather than a silent pick of the
- * first. Guessing here would delete the wrong project.
+ * first. Guessing there would put files in the wrong place.
+ *
+ * Finding nothing is not an error here; it is the answer. `upload` treats it as
+ * "then make it", and everything else refuses through `resolveProject` below.
  */
-export function resolveProject(locker: LockerDetails, reference: string): ProjectDetails {
+export function findProject(
+  locker: LockerDetails,
+  reference: string,
+): ProjectDetails | undefined {
   const wanted = reference.trim();
-  if (wanted.length === 0) {
-    throw notFoundError('No project was named.', 'locker projects list');
-  }
+  if (wanted.length === 0) return undefined;
 
   const byId = locker.projects.find((project) => project.id === wanted);
   if (byId) return byId;
@@ -44,19 +48,23 @@ export function resolveProject(locker: LockerDetails, reference: string): Projec
       project.id.startsWith(wanted.toLowerCase()),
   );
 
-  if (matches.length === 1) return matches[0] as ProjectDetails;
-  if (matches.length === 0) {
-    throw notFoundError(
-      `No project here is called "${reference}".`,
-      'locker projects list',
-    );
-  }
+  if (matches.length <= 1) return matches[0];
 
   throw new CliError(
     `"${reference}" matches ${matches.length} projects. Use the id instead:\n` +
       matches.map((project) => `  ${shortId(project.id)}  ${project.name}`).join('\n'),
     { kind: 'validation', exitCode: Exit.Usage, recovery: 'locker projects list' },
   );
+}
+
+/** The same lookup, for the commands that need a project that already exists. */
+export function resolveProject(locker: LockerDetails, reference: string): ProjectDetails {
+  if (reference.trim().length === 0) {
+    throw notFoundError('No project was named.', 'locker projects list');
+  }
+  const found = findProject(locker, reference);
+  if (found) return found;
+  throw notFoundError(`No project here is called "${reference}".`, 'locker projects list');
 }
 
 /** The same rules, one level down. A file name is not unique inside a project either. */

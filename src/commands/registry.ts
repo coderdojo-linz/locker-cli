@@ -11,6 +11,7 @@ import { filesDeleteCommand } from './filesDelete.js';
 import { filesListCommand } from './filesList.js';
 import { filesRenameCommand } from './filesRename.js';
 import { filesReplaceCommand } from './filesReplace.js';
+import { projectsCreateCommand } from './projectsCreate.js';
 import { projectsDeleteCommand } from './projectsDelete.js';
 import { projectsListCommand } from './projectsList.js';
 import { projectsRenameCommand } from './projectsRename.js';
@@ -40,6 +41,7 @@ export const COMMANDS: Command[] = [
   authLogoutCommand,
   authStatusCommand,
 
+  projectsCreateCommand,
   projectsListCommand,
   projectsShowCommand,
   projectsRenameCommand,
@@ -66,7 +68,8 @@ export const COMMANDS: Command[] = [
 export const COMMON_TASKS: { command: string; blurb: string }[] = [
   { command: 'locker auth login', blurb: 'Enter the code from your card' },
   { command: 'locker status', blurb: 'See what is in your locker' },
-  { command: 'locker upload ./my-project', blurb: 'Save work into a new project' },
+  { command: 'locker projects create Snake', blurb: 'Start a project' },
+  { command: 'locker upload ./game --project Snake', blurb: 'Put work into it' },
   { command: 'locker download <project>', blurb: 'Get work back out' },
 ];
 

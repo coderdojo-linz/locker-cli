@@ -23,20 +23,17 @@ import type { Manifest, PlannedFile } from './manifest.js';
 const CONCURRENCY = 4;
 
 /**
- * Where the files are going.
+ * Where the files are going: a project that is already there.
  *
- * Named rather than inferred from whether a project with that name happens to
- * exist. "Make a new project" and "add to that one" are different intentions,
- * and a project name is not unique — so letting a coincidence decide which one
- * happened is how somebody ends up with files in the wrong place.
+ * Only ever an existing one. Making a project is `projects create`, which does
+ * not come through here — it has no files to authorise, no ticket to spend and
+ * no quota to hold, so the three-step dance below would be three calls to
+ * arrange nothing. What that leaves this path is one endpoint instead of two,
+ * and no branch deciding which.
  */
-export type UploadTarget =
-  | { kind: 'new'; name: string }
-  | { kind: 'existing'; project: ProjectDetails };
-
 export interface UploadRequest {
   manifest: Manifest;
-  target: UploadTarget;
+  project: ProjectDetails;
   link?: string | undefined;
 }
 
@@ -44,8 +41,6 @@ export interface UploadOutcome {
   project: ProjectDetails;
   fileCount: number;
   totalBytes: number;
-  /** True when the files joined a project that was already there. */
-  added: boolean;
 }
 
 export async function performUpload(
@@ -53,15 +48,14 @@ export async function performUpload(
   request: UploadRequest,
 ): Promise<UploadOutcome> {
   const code = context.requireCode();
-  const { manifest, target, link } = request;
-  const projectId = target.kind === 'existing' ? target.project.id : undefined;
+  const { manifest, project: destination, link } = request;
 
   const authorization = await authorize(
     context,
     code,
     manifest.files,
-    projectId,
-    target.kind === 'new' ? target.name : target.project.name,
+    destination.id,
+    destination.name,
   );
   // From here on a ticket exists and the locker has space held against it, so
   // every exit path has to go through abandon or the locker stays reserved.
@@ -83,35 +77,24 @@ export async function performUpload(
     if (authorization) await sendAll(context, authorization, manifest);
 
     const ticket = authorization?.ticket ?? null;
-    const project =
-      target.kind === 'new'
-        ? await context.api.request<ProjectDetails>(
-            `/api/lockers/${encodeURIComponent(code)}/projects`,
-            {
-              method: 'POST',
-              body: { name: target.name, link: link ?? null, ticket },
-              notFound: { kind: 'credential' },
-            },
-          )
-        : await context.api.request<ProjectDetails>(
-            `/api/lockers/${encodeURIComponent(code)}/projects/${target.project.id}/files`,
-            {
-              method: 'POST',
-              body: { link: link ?? null, ticket },
-              notFound: {
-                kind: 'resource',
-                message: `"${target.project.name}" is no longer in this locker.`,
-                recovery: 'locker projects list',
-              },
-            },
-          );
+    const project = await context.api.request<ProjectDetails>(
+      `/api/lockers/${encodeURIComponent(code)}/projects/${destination.id}/files`,
+      {
+        method: 'POST',
+        body: { link: link ?? null, ticket },
+        notFound: {
+          kind: 'resource',
+          message: `"${destination.name}" is no longer in this locker.`,
+          recovery: 'locker projects list',
+        },
+      },
+    );
 
     released = true; // The ticket was spent by that call; there is nothing to give back.
     return {
       project,
       fileCount: manifest.files.length,
       totalBytes: manifest.totalBytes,
-      added: target.kind === 'existing',
     };
   } catch (error) {
     await releaseOnce();

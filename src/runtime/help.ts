@@ -26,7 +26,7 @@ const describeOption = (name: string, spec: OptionSpec): string => {
 };
 
 function optionLines(options: Record<string, OptionSpec>, palette: Palette): string {
-  const entries = Object.entries(options);
+  const entries = Object.entries(options).filter(([, spec]) => !spec.hidden);
   if (entries.length === 0) return '';
   const width = Math.max(...entries.map(([name, spec]) => describeOption(name, spec).length));
   return entries
@@ -95,8 +95,9 @@ export function renderRootHelp(palette: Palette, version: string): string {
       'EXAMPLES',
       [
         `${INDENT}locker auth login`,
-        `${INDENT}locker upload ./my-game --name "Snake" --dry-run`,
-        `${INDENT}locker upload ./my-game --name "Snake"`,
+        `${INDENT}locker projects create "Snake"`,
+        `${INDENT}locker upload ./my-game --project Snake --dry-run`,
+        `${INDENT}locker upload ./my-game --project Snake`,
         `${INDENT}locker download Snake --out ~/projects`,
         `${INDENT}LOCKER_CODE=K7F29QB3 locker status --json`,
       ].join('\n'),

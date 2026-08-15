@@ -58,7 +58,7 @@ export async function buildManifest(
     try {
       stats = await fs.lstat(absolute);
     } catch {
-      throw usageError(`There is nothing at "${input}".`, 'locker upload ./my-project --name "My project"');
+      throw usageError(`There is nothing at "${input}".`, 'locker upload ./my-project --project "My project"');
     }
 
     if (stats.isSymbolicLink()) {
@@ -145,7 +145,7 @@ function validate(files: PlannedFile[]): void {
   if (files.length === 0) {
     throw usageError(
       'None of those paths held a file to upload.',
-      'locker upload ./my-project --name "My project" --all',
+      'locker upload ./my-project --project "My project" --all',
     );
   }
 
