@@ -25,11 +25,16 @@ export interface RequestOptions {
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class ApiClient {
+  /**
+   * @param deviceKey Called on first use rather than up front, so a command that
+   * never talks to a locker does not mint and write one.
+   */
   constructor(
     readonly origin: string,
     private readonly language: string,
     private readonly reporter: Reporter,
     private readonly diagnostics: Diagnostics,
+    private readonly deviceKey: () => string,
     private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ) {}
 
@@ -160,6 +165,9 @@ export class ApiClient {
       'Accept-Language': this.language,
       Accept: options.accept ?? 'application/json',
       'User-Agent': 'coderdojo-locker-cli',
+      // What a browser keeps in a cookie: at a Dojo that has a mentor look at
+      // work first, this is what lets the child who uploaded it still open it.
+      'X-Locker-Device': this.deviceKey(),
     };
     if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import type { AuthorizedUpload, ProjectDetails, UploadFileRequest } from '../api/types.js';
 import { formatBytes } from '../runtime/format.js';
 import type { Context } from '../runtime/context.js';
+import { clearGate, readGate } from './approval.js';
 import type { Manifest, PlannedFile } from './manifest.js';
 
 /**
@@ -55,7 +56,13 @@ export async function performUpload(
   const { manifest, target, link } = request;
   const projectId = target.kind === 'existing' ? target.project.id : undefined;
 
-  const authorization = await authorize(context, code, manifest.files, projectId);
+  const authorization = await authorize(
+    context,
+    code,
+    manifest.files,
+    projectId,
+    target.kind === 'new' ? target.name : target.project.name,
+  );
   // From here on a ticket exists and the locker has space held against it, so
   // every exit path has to go through abandon or the locker stays reserved.
   let released = false;
@@ -135,7 +142,7 @@ export async function performReplace(
     skipped: [],
   };
 
-  const authorization = await authorize(context, code, manifest.files, undefined);
+  const authorization = await authorize(context, code, manifest.files, undefined, file.name);
   let released = false;
   const releaseOnce = async (): Promise<void> => {
     if (released) return;
@@ -181,6 +188,7 @@ async function authorize(
   code: string,
   files: PlannedFile[],
   projectId: string | undefined,
+  projectName?: string,
 ): Promise<AuthorizedUpload | null> {
   if (files.length === 0) return null;
 
@@ -195,15 +203,33 @@ async function authorize(
     ...(projectId ? { projectId } : {}),
   };
 
+  const totalBytes = files.reduce((total, file) => total + file.size, 0);
   context.reporter.note(
     `Asking for room for ${files.length} file${files.length === 1 ? '' : 's'} (${formatBytes(
-      files.reduce((total, file) => total + file.size, 0),
+      totalBytes,
     )})…`,
   );
-  return context.api.request<AuthorizedUpload>(
-    `/api/lockers/${encodeURIComponent(code)}/projects/uploads`,
-    { method: 'POST', body, notFound: { kind: 'credential' } },
-  );
+  const ask = (): Promise<AuthorizedUpload> =>
+    context.api.request<AuthorizedUpload>(
+      `/api/lockers/${encodeURIComponent(code)}/projects/uploads`,
+      { method: 'POST', body, notFound: { kind: 'credential' } },
+    );
+
+  try {
+    return await ask();
+  } catch (error) {
+    // Some Dojos want a mentor to say yes, or the child to have scanned the code
+    // on the wall. The server says which before any bytes move; clearGate does
+    // whatever that needs — including waiting — and throws if it cannot.
+    const gate = readGate(error);
+    if (!gate) throw error;
+    await clearGate(context, code, gate, {
+      projectName,
+      fileCount: files.length,
+      totalBytes,
+    });
+    return await ask();
+  }
 }
 
 /**

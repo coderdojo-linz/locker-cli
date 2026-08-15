@@ -103,6 +103,13 @@ export const uploadCommand: Command = {
         ? `Added ${pluralize(outcome.fileCount, 'file')} to "${project.name}" (${formatBytes(outcome.totalBytes)}).`
         : `Saved "${project.name}" — ${pluralize(outcome.fileCount, 'file')}, ${formatBytes(outcome.totalBytes)}.`,
     );
+    // Saved either way: what waits at a Dojo that reviews is everybody else, and
+    // a child who is not told will think their share link is broken.
+    if (project.reviewState === 'Pending') {
+      context.reporter.note(
+        'A mentor still has to look at this before a share link will open for anybody else.',
+      );
+    }
 
     return {
       human: [

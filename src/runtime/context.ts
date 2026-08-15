@@ -1,7 +1,7 @@
 import { ApiClient } from './api.js';
 import { codeProblem, normalizeCode } from './code.js';
 import { readConfig } from './config.js';
-import { readStoredCode } from './credentials.js';
+import { readDeviceKey, readStoredCode } from './credentials.js';
 import { Diagnostics } from './diagnostics.js';
 import { CliError, Exit, usageError } from './exit.js';
 import { Reporter, type OutputMode } from './reporter.js';
@@ -151,7 +151,13 @@ export function createContext(flags: GlobalFlags, env: NodeJS.ProcessEnv = proce
   diagnostics.useSecrets({ code });
   diagnostics.record(`resolved host ${origin} (code from ${codeSource})`);
 
-  const api = new ApiClient(origin, language, reporter, diagnostics);
+  // Memoised: the first command that talks to a locker mints and stores a key,
+  // and every later one reuses it. Lazy, so `--help` writes no file.
+  let deviceKey: string | null = null;
+  const api = new ApiClient(origin, language, reporter, diagnostics, () => {
+    deviceKey ??= readDeviceKey(origin, env);
+    return deviceKey;
+  });
 
   return {
     origin,

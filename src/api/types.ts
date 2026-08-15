@@ -26,6 +26,13 @@ export interface ProjectDetails {
   createdAt: string;
   files: ProjectFileDetails[];
   shareCode: string | null;
+  /**
+   * Where this stands with the mentors at a Dojo that asks them to look:
+   * `NotRequired` everywhere else. Absent from an older server, which is why
+   * every reader treats a missing value as `NotRequired`.
+   */
+  reviewState?: string;
+  reviewNote?: string | null;
 }
 
 export interface LockerDetails {
@@ -74,4 +81,38 @@ export interface UploadFileRequest {
   name: string;
   size: number;
   contentType: string;
+}
+
+/**
+ * Why a Dojo would not let this upload start, in the words a client switches on.
+ *
+ * Rides on the 403 the authorize step answers with, beside the sentence a person
+ * reads. The sentence is the server's and is shown as written; this is what
+ * decides whether the CLI can do something about it — hold up a QR code, wait
+ * for a poster to be scanned — or can only say so and stop.
+ */
+export interface UploadGateProblem {
+  verdict: 'NeedsApproval' | 'NeedsEventCode' | 'WrongNetwork' | string;
+  mode: string;
+  eventId: string | null;
+  eventName: string | null;
+  approvalMinutes: number;
+}
+
+/** A child's request for a mentor to vouch for what they are saving. */
+export interface ApprovalTicket {
+  code: string;
+  status: 'Pending' | 'Approved' | 'Denied' | 'Expired' | string;
+  /** The whole address, which is what goes inside the QR code. */
+  approveUrl: string;
+  expiresAt: string;
+  decidedByName: string | null;
+  permitExpiresAt: string | null;
+}
+
+/** What a locker is currently allowed, after a mentor or a scanned poster said so. */
+export interface UploadPermitDetails {
+  expiresAt: string;
+  singleUse: boolean;
+  source: string;
 }
