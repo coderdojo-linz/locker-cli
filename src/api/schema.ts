@@ -4185,6 +4185,7 @@ export interface components {
             eventId: string | null;
             eventName: string | null;
             signInMethod: string;
+            emailConfirmed: boolean;
         };
         MentorRequest: {
             name: string;
