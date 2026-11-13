@@ -598,6 +598,15 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SignedOut"];
+                    };
+                };
                 /** @description No Content */
                 204: {
                     headers: {
@@ -4356,6 +4365,9 @@ export interface components {
             expiresAt: string;
             wholeProject: boolean;
             files: components["schemas"]["SharedFileDetails"][];
+        };
+        SignedOut: {
+            signOutUrl: string;
         };
         UpdateLockerRequest: {
             name: string;
